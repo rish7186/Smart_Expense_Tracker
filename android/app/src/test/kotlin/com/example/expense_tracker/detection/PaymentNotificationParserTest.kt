@@ -59,6 +59,42 @@ class PaymentNotificationParserTest {
     }
 
     @Test
+    fun detectsSmallDebitInsteadOfNearbyMandateAmount() {
+        val transactions = PaymentNotificationParser.parseAll(
+            notification(
+                packageName = PaymentNotificationParser.GOOGLE_MESSAGES_PACKAGE,
+                title = "AD-ICICIT-S",
+                text = "Your AutoPay mandate with ONETIME was created for Rs 14905.00, " +
+                    "RRN 628878291894-ICICI Bank. ICICI Bank Acct XX514 debited for " +
+                    "Rs 1.00 on 15-Oct-26; MANOJ KANIYALAL credited.",
+                postedAt = 1234L,
+            ),
+        )
+
+        assertEquals(1, transactions.size)
+        assertEquals(100L, transactions.single().amountMinor)
+        assertEquals(TransactionType.EXPENSE, transactions.single().type)
+    }
+
+    @Test
+    fun parsesMultipleTransactionsFromGroupedNotificationIndividually() {
+        val transactions = PaymentNotificationParser.parseAll(
+            notification(
+                packageName = PaymentNotificationParser.GOOGLE_MESSAGES_PACKAGE,
+                text = "A/c debited Rs 10.00 to Shop. A/c credited Rs 20.00 from Salary",
+                postedAt = 1234L,
+            ),
+        )
+
+        assertEquals(2, transactions.size)
+        assertEquals(1_000L, transactions[0].amountMinor)
+        assertEquals(TransactionType.EXPENSE, transactions[0].type)
+        assertEquals(2_000L, transactions[1].amountMinor)
+        assertEquals(TransactionType.INCOME, transactions[1].type)
+        assertNotEquals(transactions[0].referenceId, transactions[1].referenceId)
+    }
+
+    @Test
     fun parsesBankCreditSmsAndIgnoresNonTransactionSms() {
         val credit = PaymentNotificationParser.parse(
             notification(

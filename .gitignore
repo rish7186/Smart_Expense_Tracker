@@ -43,6 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/build/
+
+# JVM heap dumps
+*.hprof
 
 # Root Gradle entry point for the native Android app
 /.gradle/

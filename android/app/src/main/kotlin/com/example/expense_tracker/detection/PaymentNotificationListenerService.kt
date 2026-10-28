@@ -36,7 +36,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
                 ?.joinToString(" ") { it.toString() },
         ).distinct().joinToString(" ").takeIf { it.isNotBlank() }
-        val parsed = PaymentNotificationParser.parse(
+        val parsed = PaymentNotificationParser.parseAll(
             PaymentNotification(
                 packageName = statusBarNotification.packageName,
                 notificationKey = statusBarNotification.key,
@@ -44,13 +44,16 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                 text = text,
                 postedAtEpochMillis = statusBarNotification.postTime,
             ),
-        ) ?: return
+        )
+        if (parsed.isEmpty()) return
 
         serviceScope.launch {
             processingLock.withLock {
                 try {
                     val application = application as ExpenseTrackerApplication
-                    application.repository.addDetectedTransactionIfNew(parsed)
+                    parsed.forEach { transaction ->
+                        application.repository.addDetectedTransactionIfNew(transaction)
+                    }
                 } catch (error: IllegalArgumentException) {
                     Log.e(TAG, "Rejected an invalid payment notification.", error)
                 } catch (error: SQLiteException) {

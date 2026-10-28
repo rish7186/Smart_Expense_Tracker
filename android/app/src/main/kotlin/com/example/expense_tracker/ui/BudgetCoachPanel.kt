@@ -21,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -38,6 +40,7 @@ fun BudgetCoachPanel(
     insights: List<BudgetInsight>,
     transactions: List<TransactionEntity>,
     today: LocalDate,
+    hideAmounts: Boolean = false,
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     var advice by remember { mutableStateOf<BudgetAdvice?>(null) }
@@ -71,6 +74,9 @@ fun BudgetCoachPanel(
                     warning == null -> "You’re currently on pace for your set budgets. Ask for a plan to keep it that way."
                     else -> warningMessage(warning)
                 },
+                modifier = Modifier.semantics {
+                    if (hideAmounts) contentDescription = "Budget status. Amounts hidden."
+                },
                 color = if (warning == null) {
                     MaterialTheme.colorScheme.onSecondaryContainer
                 } else {
@@ -80,7 +86,11 @@ fun BudgetCoachPanel(
 
             insights.filter { it.status != BudgetStatus.ON_TRACK }.forEach { insight ->
                 Text(
-                    "${budgetLabel(insight.categoryId)}: ${Money.formatMinorUnits(insight.spentMinor)} of ${Money.formatMinorUnits(insight.limitMinor)} · forecast ${Money.formatMinorUnits(insight.projectedMinor)}",
+                    if (hideAmounts) {
+                        "${budgetLabel(insight.categoryId)}: amounts hidden"
+                    } else {
+                        "${budgetLabel(insight.categoryId)}: ${Money.formatMinorUnits(insight.spentMinor)} of ${Money.formatMinorUnits(insight.limitMinor)} · forecast ${Money.formatMinorUnits(insight.projectedMinor)}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (warning != null) MaterialTheme.colorScheme.onErrorContainer
                     else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -111,11 +121,17 @@ fun BudgetCoachPanel(
             advice?.let { answer ->
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(answer.title, fontWeight = FontWeight.SemiBold)
-                    Text(answer.message, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        maskCurrency(answer.message, hideAmounts),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     answer.suggestions.forEach { suggestion ->
                         Row {
                             Text("•", modifier = Modifier.padding(end = 8.dp))
-                            Text(suggestion, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                maskCurrency(suggestion, hideAmounts),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                     }
                 }
@@ -130,6 +146,9 @@ fun BudgetCoachPanel(
         }
     }
 }
+
+private fun maskCurrency(text: String, hideAmounts: Boolean): String =
+    if (hideAmounts) text.replace(Regex("""₹\s*[\d,]+(?:\.\d{1,2})?"""), "••••") else text
 
 private fun warningMessage(insight: BudgetInsight): String {
     val label = budgetLabel(insight.categoryId)
